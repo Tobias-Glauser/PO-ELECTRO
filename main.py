@@ -58,8 +58,8 @@ interrupt_Start = 0
 interrupt_Stop = 0
 interrupt_Sect1 = 0
 interrupt_Sect2 = 0
-capteur_Vitesse_1 = 0
-capteur_Vitesse_2 = 0
+capteur_vitesse_1 = 0
+capteur_vitesse_2 = 0
 TotalTime = 0
 actualTick = 0
 actualTime = 0
@@ -79,15 +79,12 @@ GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S5, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S6, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-
 GPIO.setup(state_pin, GPIO.OUT)
-GPIO.setup(17, GPIO.OUT)
-GPIO.output(17, 1)
 # state_pin = machine.Pin(14, machine.Pin.OUT)
 Query_ID = '4357'
 penalitee = 0
 DiffTemps = 0
-vitesse = 0
+distance = 50#distance en mm entre les deux capteurs pour la vitesse
 
 res = requests.post(jelastic_api + "authentication/section/", json=authentification)
 print(res.json())
@@ -190,9 +187,9 @@ def get_id_car(Query_ID):
 
 
 def get_bonus(id_car):
-    print('test')
+    print('test_bonus')
     res = requests.get(jelastic_api + "activity/by-car/" + str(id_car))
-    print(res, 'test')
+    print(res, 'test_bonus2')
     json = res.json()
     bonus = []
     for test in json:
@@ -218,10 +215,6 @@ def get_bonus(id_car):
 
 #					fonction interrupteur START
 def Interrupt_Start(unused):
-    print(unused)
-    if (unused != S1):
-        return
-    print("test1")
     global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, dixieme, StartTime, ms_start, run, timer_chrono
     if interrupt_Sect1 == 0 and fin == 0 and run == 0:
         interrupt_Stop = 0
@@ -245,19 +238,15 @@ def Interrupt_Start(unused):
             print("\nStart: ", end='\t')
             print(Start_Hour)
             #             pcf.pin(16, 1)
-            start_record()
+            # start_record()
             get_bonus(1)
 
 
 #					fonction interrupteur SECTEUR 1
 def Interrupt_Sect1(unused):
-    print(unused)
-    if (unused != S3):
-        return
-    print("test2")
-    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_Vitesse_2, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause
-    if capteur_Vitesse_2 == 1:
-        capteur_Vitesse_2 = 0
+    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_vitesse_2, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause
+    if capteur_vitesse_2 == 1:
+        capteur_vitesse_2 = 0
         if interrupt_Sect1 == 0:
             Sect1_Tick = time.perf_counter()
             interrupt_Sect1 = 1
@@ -268,21 +257,17 @@ def Interrupt_Sect1(unused):
             GPIO.output(state_pin, 1)
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             Sect1_Hour = ("{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
-                                                                                   str(StartTime[2]), str(h_sect1),
+                                                                                   str(StartTime.tm_mday), str(h_sect1),
                                                                                    str(m_sect1), str(s_sect1),
                                                                                    str(ms_sect1)))
             print("Sect1: ", end='\t')
             print(Sect1_Hour)
             dictionary["sector1"] = Sect1_Hour
-            plan2_record()
+            # plan2_record()
 
 
 #					fonction interrupteur SECTEUR 2
 def Interrupt_Sect2(unused):
-    print(unused)
-    if (unused != S4):
-        return
-    print("test3")
     global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause
     if interrupt_Sect1 == 1:
         interrupt_Sect1 = 0
@@ -302,15 +287,11 @@ def Interrupt_Sect2(unused):
             print("Sect2: ", end='\t')
             print(Sect2_Hour)
             dictionary["sector2"] = Sect2_Hour
-            plan3_record()
+            # plan3_record()
 
 
 #					fonction interrupteur STOP
 def Interrupt_Stop(unused):
-    print(unused)
-    if (unused != S2):
-        return
-    print("test4")
     global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, StopTick, pause, TotalTime, StartTick, timer_chrono, soft_timer, StopTime, run, authentification, token_str, ms_finish, actualTime, fin
     if interrupt_Sect2 == 1:
         interrupt_Sect2 = 0
@@ -339,7 +320,7 @@ def Interrupt_Stop(unused):
             print(dictionary)
             soft_timer.stop()
             #             pcf.port = 0x0000
-            stop_record()
+            # stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
             print(r.status_code)
             print(token_str)
@@ -350,37 +331,29 @@ def Interrupt_Stop(unused):
                 r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str},
                                    json=dictionary)
             print(r.json())
-            _thread.start_new_thread(upload, (r.json()["id_race"],))
+            # _thread.start_new_thread(upload, (r.json()["id_race"],))
 
 
 def Capteur_Vitesse_1(unused):
-    print(unused)
-    if (unused != S5):
-        return
-    print("test5")
-    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_Vitesse_1, actualTime, Temps1
+    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_vitesse_1, actualTime, Temps1
     if interrupt_Start == 1:
         interrupt_Start = 0
-        print(capteur_Vitesse_1)
-        if capteur_Vitesse_1 == 0:
+        print(capteur_vitesse_1)
+        if capteur_vitesse_1 == 0:
             Temps1 = actualTime
-            capteur_Vitesse_1 = 1
+            capteur_vitesse_1 = 1
 
 
 def Capteur_Vitesse_2(unused):
-    print(unused)
-    if (unused != S6):
-        return
-    print("test6")
-    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_Vitesse_1, capteur_Vitesse_2, actualTime, Temps1
-    if capteur_Vitesse_1 == 1:
-        capteur_Vitesse_1 = 0
-        if capteur_Vitesse_2 == 0:
+    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_vitesse_1, capteur_vitesse_2, actualTime, Temps1
+    if capteur_vitesse_1 == 1:
+        capteur_vitesse_1 = 0
+        if capteur_vitesse_2 == 0:
             Temps2 = actualTime
             DiffTemps = Temps2 - Temps1
-            vitesse = (5 / DiffTemps) * 3.6
-            capteur_Vitesse_2 = 1
-            print("vitesse")
+            vitesse = (distance/DiffTemps) * 360
+            capteur_vitesse_2 = 1
+            print(vitesse)
 
 
 #					Boucle
