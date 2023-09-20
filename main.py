@@ -4,8 +4,10 @@ import RPi.GPIO as GPIO
 # from machine import Timer, Pin, UART, I2C
 import requests
 import pcf8575
-import _thread
+import threading
+import atexit
 from timerV2 import RepeatedTimer
+from serial.tools import list_ports
 # from machine import Timer
 
 # while True:
@@ -14,10 +16,16 @@ from timerV2 import RepeatedTimer
 
 
 jelastic_api = 'https://voiture.divtec.me/api/'
-obs_api = 'http://192.168.1.104/obs/'
+obs_api = 'http://192.168.1.100/obs/'
 
 #					Initialisation UART pour le chrono
-uart_chrono = serial.Serial('/dev/ttyAMA0', 9600)
+# for port in list_ports.comports():
+#     print(port)
+uart_chrono = serial.Serial('/dev/ttyAMA0', 9600, parity=serial.PARITY_NONE,
+  stopbits=serial.STOPBITS_ONE,
+  bytesize=serial.EIGHTBITS,
+  timeout=1)
+
 
 #					Initialisation UART pour le scanner QR
 # uart = UART(0, baudrate=57600, tx=Pin(0), rx=Pin(1))
@@ -113,6 +121,7 @@ def runtime_handler_chrono():  # Timer 100ms
 
     if (pause == 0 and fin == 0):
         uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
+        # print("actualTime")
 
     if fin == 1:
         timer_fin += 1
@@ -215,6 +224,7 @@ def get_bonus(id_car):
 
 #					fonction interrupteur START
 def Interrupt_Start(unused):
+    print(1)
     global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, dixieme, StartTime, ms_start, run, timer_chrono
     if interrupt_Sect1 == 0 and fin == 0 and run == 0:
         interrupt_Stop = 0
@@ -225,6 +235,7 @@ def Interrupt_Start(unused):
             run = 1
             StartTime = time.localtime()
             ms_start = ((StartTime.tm_hour * 3600000) + (StartTime.tm_min * 60000) + (StartTime.tm_sec * 1000))
+            print(str(StartTime.tm_sec))
             Start_Hour = ("{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.000Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
                                                                                 str(StartTime.tm_mday), str(StartTime.tm_hour),
                                                                                 str(StartTime.tm_min), str(StartTime.tm_sec)))
@@ -235,35 +246,46 @@ def Interrupt_Start(unused):
             soft_timer = RepeatedTimer(0.01, runtime_handler)
             timer_chrono = RepeatedTimer(0.1, runtime_handler_chrono)
             dictionary["race_start"] = Start_Hour
+            print(dictionary)
             print("\nStart: ", end='\t')
             print(Start_Hour)
             #             pcf.pin(16, 1)
-            # start_record()
+            start_record()
             get_bonus(1)
 
 
 #					fonction interrupteur SECTEUR 1
 def Interrupt_Sect1(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_vitesse_2, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause
+    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_vitesse_2, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause, StartTime
     if capteur_vitesse_2 == 1:
         capteur_vitesse_2 = 0
         if interrupt_Sect1 == 0:
-            Sect1_Tick = time.perf_counter()
-            interrupt_Sect1 = 1
-            Time_Sect1 = (Sect1_Tick - StartTick) // 1000
-            secteur1_hour(Time_Sect1)
-            timer_pause = 0
-            pause = 1
-            GPIO.output(state_pin, 1)
-            uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
-            Sect1_Hour = ("{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
-                                                                                   str(StartTime.tm_mday), str(h_sect1),
-                                                                                   str(m_sect1), str(s_sect1),
-                                                                                   str(ms_sect1)))
-            print("Sect1: ", end='\t')
-            print(Sect1_Hour)
-            dictionary["sector1"] = Sect1_Hour
-            # plan2_record()
+            try:
+                Sect1_Tick = time.perf_counter()
+                interrupt_Sect1 = 1
+                Time_Sect1 = (Sect1_Tick - StartTick) // 1000
+                secteur1_hour(Time_Sect1)
+                timer_pause = 0
+                pause = 1
+                GPIO.output(state_pin, 1)
+                print("actualTime")
+                uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
+                print("actualTime")
+                print(str(h_sect1),str(m_sect1), str(s_sect1),str(ms_sect1))
+                Sect1_Hour = ("{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year),
+                                                                                       str(StartTime.tm_mon),
+                                                                                       str(StartTime.tm_mday),
+                                                                                       str(int(h_sect1)),
+                                                                                       str(int(m_sect1)), str(int(s_sect1)),
+                                                                                       str(int(ms_sect1))))
+                print("Sect1: ", end='\t')
+                print(Sect1_Hour)
+                dictionary["sector1"] = Sect1_Hour
+                print(dictionary)
+                plan2_record()
+            except Exception as e:
+                print('erreur', e)
+
 
 
 #					fonction interrupteur SECTEUR 2
@@ -272,6 +294,7 @@ def Interrupt_Sect2(unused):
     if interrupt_Sect1 == 1:
         interrupt_Sect1 = 0
         if (interrupt_Sect2 == 0):
+            print('test4')
             Sect2_Tick = time.perf_counter()
             interrupt_Sect2 = 1
             Time_Sect2 = (Sect2_Tick - StartTick) // 1000
@@ -281,13 +304,14 @@ def Interrupt_Sect2(unused):
             GPIO.output(state_pin, 1)
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             Sect2_Hour = ("{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
-                                                                                   str(StartTime.tm_mday), str(h_sect2),
-                                                                                   str(m_sect2), str(s_sect2),
-                                                                                   str(ms_sect2)))
+                                                                                   str(StartTime.tm_mday), str(int(h_sect2)),
+                                                                                   str(int(m_sect2)), str(int(s_sect2)),
+                                                                                   str(int(ms_sect2))))
             print("Sect2: ", end='\t')
             print(Sect2_Hour)
             dictionary["sector2"] = Sect2_Hour
-            # plan3_record()
+            print(dictionary)
+            plan3_record()
 
 
 #					fonction interrupteur STOP
@@ -312,15 +336,15 @@ def Interrupt_Stop(unused):
             print("Stop: ", end='\t')
             Finish_Hour = (
                 "{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
-                                                                         str(StartTime.tm_mday), str(h_finish),
-                                                                         str(m_finish), str(s_finish), str(ms_finish)))
+                                                                         str(StartTime.tm_mday), str(int(h_finish)),
+                                                                         str(int(m_finish)), str(int(s_finish)), str(int(ms_finish))))
             print(Finish_Hour)
             dictionary["race_finish"] = Finish_Hour
             dictionary["query_id"] = Query_ID
             print(dictionary)
             soft_timer.stop()
             #             pcf.port = 0x0000
-            # stop_record()
+            stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
             print(r.status_code)
             print(token_str)
@@ -331,7 +355,7 @@ def Interrupt_Stop(unused):
                 r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str},
                                    json=dictionary)
             print(r.json())
-            # _thread.start_new_thread(upload, (r.json()["id_race"],))
+            threading.Thread(target=upload, args=(r.json()["id_race"],))
 
 
 def Capteur_Vitesse_1(unused):
@@ -358,7 +382,7 @@ def Capteur_Vitesse_2(unused):
 
 #					Boucle
 
-GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start)
+GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start, bouncetime=200)
 GPIO.add_event_detect(S2, GPIO.RISING, callback=Interrupt_Stop)
 GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1)
 GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2)
@@ -366,12 +390,7 @@ GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1)
 GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2)
 while True:
     pass
-    # S1.irq(trigger=S1.IRQ_RISING, handler=Interrupt_Start)
-    # S2.irq(trigger=S2.IRQ_RISING, handler=Interrupt_Stop)
-    # S3.irq(trigger=S3.IRQ_RISING, handler=Interrupt_Sect1)
-    # S4.irq(trigger=S4.IRQ_RISING, handler=Interrupt_Sect2)
-    # S5.irq(trigger=S5.IRQ_RISING, handler=Capteur_Vitesse_1)
-    # S6.irq(trigger=S6.IRQ_RISING, handler=Capteur_Vitesse_2)
+
 #     if (run == 0):
 #         QR_data = uart.read()
 #         if QR_data != None:
