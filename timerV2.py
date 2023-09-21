@@ -19,7 +19,6 @@ class RepeatedTimer:
         threading.Thread(target=self._run).start()
 
     def stop(self):
-        print("Stopping timer---------------------------------------------")
         self.is_running = False
 
     def _run(self):
