@@ -6,6 +6,7 @@ import smbus
 import threading
 import atexit
 from timerV2 import RepeatedTimer
+from qrreader import QRReader
 from serial.tools import list_ports
 # from machine import Timer
 
@@ -36,6 +37,7 @@ authentification = {
 }
 
 #					Variables
+old_qr = None
 pause = 0
 run = 0
 fin = 0
@@ -63,9 +65,31 @@ S4 = 5#sect2
 S5 = 19#catp1
 S6 = 13#capt2
 
+start_barrier = 21#signal barrier start
+capt1_barrier = 20#signal barrier capt1
+capt2_barrier = 16#signal barrier capt2
+sect1_barrier = 12#signal barrier sect1
+sect2_barrier = 1#signal barrier sect2
+stop_barrier = 7#signal barrier stop
+bonus_elt_out = 8
+bonus_dcm_out = 25
+bonus_aut_out = 24
+bonus_mmc_out = 23
+signal_run =18
+signal_souffleuse = 17
 
-
-
+GPIO.setup(start_barrier, GPIO.OUT)
+GPIO.setup(capt1_barrier, GPIO.OUT)
+GPIO.setup(capt2_barrier, GPIO.OUT)
+GPIO.setup(sect1_barrier, GPIO.OUT)
+GPIO.setup(sect2_barrier, GPIO.OUT)
+GPIO.setup(stop_barrier, GPIO.OUT)
+GPIO.setup(bonus_elt_out, GPIO.OUT)
+GPIO.setup(bonus_dcm_out, GPIO.OUT)
+GPIO.setup(bonus_aut_out, GPIO.OUT)
+GPIO.setup(bonus_mmc_out, GPIO.OUT)
+GPIO.setup(signal_run, GPIO.OUT)
+GPIO.setup(signal_souffleuse, GPIO.OUT)
 
 GPIO.setup(S1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -73,7 +97,7 @@ GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S5, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S6, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-Query_ID = '4357'
+Query_ID = None
 penalitee = 0#En milliseconds
 temps_final = 0
 distance = 50#distance en mm entre les deux capteurs pour la vitesse
@@ -95,13 +119,15 @@ def runtime_handler():  # Timer 10ms
 
 
 def runtime_handler_chrono():  # Timer 100ms
-    global actualTick, actualTick, actualTime, StartTick, timer_pause, pause, fin, timer_fin, penalitee, temps_final
+    global actualTick, actualTick, actualTime, StartTick, timer_pause, pause, fin, timer_fin, penalitee, temps_final, run, Query_ID
     if pause == 1:
         timer_pause += 1
         if timer_pause > 20:
             timer_pause = 0
             pause = 0
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
+            if interrupt_Sect1 == 1:
+                GPIO.output(signal_souffleuse, 0)
 
     if pause == 0 and fin == 0:
         temps_final = actualTime
@@ -113,9 +139,11 @@ def runtime_handler_chrono():  # Timer 100ms
             temps_final += 1
             uart_chrono.write(temps_final)
         if timer_fin > 100:
+            run = 0  # course terminée
             timer_fin = 0
             fin = 0
-            pcf.set_output(15, 1)
+            Query_ID = None
+            GPIO.output(start_barrier, 1)
             timer_chrono.stop()
             uart_chrono.write("rien".encode('utf-8'))
             print('fin')
@@ -197,23 +225,29 @@ def get_bonus(id_car):
 
 def bonus_activation(bonus):
     global penalitee
-    if 1 in bonus:
-        penalitee += 2 #activation bonus informaticiens
+    if 1 not in bonus:
+        #activation bonus informaticiens
+        penalitee += 2
         print('bonus1')
     if 2 in bonus:
-         pcf.set_output(3, 1)#activation bonus automaticiens
+         #activation bonus automaticiens
+         GPIO.output(bonus_aut_out, 1)
          print('bonus2')
     if 4 in bonus:
-         pcf.set_output(5, 1)#activation bonus électroniciens
+         #activation bonus électroniciens
+         GPIO.output(bonus_elt_out, 1)
          print('bonus4')
     if 5 in bonus:
-         pcf.set_output(2, 1)#activation bonus micromécaniciens
+         #activation bonus micromécaniciens
+         GPIO.output(bonus_mmc_out, 1)
          print('bonus5')
-    if 6 in bonus:
-        penalitee += 2 #activation bonus laborantins
+    if 6 not in bonus:
+        #activation bonus laborantins
+        penalitee += 2
         print('bonus6')
     if 7 in bonus:
-         pcf.set_output(4, 1)#activation bonus dessinateurs
+         #activation bonus dessinateurs
+         GPIO.output(bonus_dcm_out, 1)
          print('bonus7')
 
 #					fonction interrupteur START
@@ -239,10 +273,9 @@ def Interrupt_Start(unused):
             print("\nStart: ", end='\t')
             print(Start_Hour)
             # start_record()
-            bonus_activation(get_bonus(1))
-            pcf.set_output(1, 1)
-            pcf.set_output(15, 0)
-            pcf.set_output(14, 1)
+            GPIO.output(signal_run, 1)
+            GPIO.output(start_barrier, 0)
+            GPIO.output(capt1_barrier, 1)
 
 
 #					fonction interrupteur SECTEUR 1
@@ -271,8 +304,9 @@ def Interrupt_Sect1(unused):
                 print(Sect1_Hour)
                 dictionary["sector1"] = Sect1_Hour
                 print(dictionary)
-                pcf.set_output(12, 0)
-                pcf.set_output(11, 1)
+                GPIO.output(signal_souffleuse, 1)
+                GPIO.output(sect1_barrier, 0)
+                GPIO.output(sect2_barrier, 1)
                 # plan2_record()
             except Exception as e:
                 print('erreur', e)
@@ -301,8 +335,8 @@ def Interrupt_Sect2(unused):
             print(Sect2_Hour)
             dictionary["sector2"] = Sect2_Hour
             print(dictionary)
-            pcf.set_output(11, 0)
-            pcf.set_output(10, 1)
+            GPIO.output(sect2_barrier, 0)
+            GPIO.output(stop_barrier, 1)
             # plan3_record()
 
 
@@ -312,7 +346,6 @@ def Interrupt_Stop(unused):
     if interrupt_Sect2 == 1:
         interrupt_Sect2 = 0
         if interrupt_Stop == 0:
-            run = 0  # course terminée
             pause = 0
             fin = 1
             interrupt_Stop = 1
@@ -338,12 +371,13 @@ def Interrupt_Stop(unused):
             dictionary["query_id"] = Query_ID
             print(dictionary)
             soft_timer.stop()
-            pcf.set_output(1,0)
-            pcf.set_output(10, 0)
-            pcf.set_output(11, 0)
-            pcf.set_output(12, 0)
-            pcf.set_output(13, 0)
-            pcf.set_output(14, 0)
+            GPIO.output(stop_barrier, 0)
+            GPIO.output(signal_run, 0)
+            GPIO.output(bonus_dcm_out, 0)
+            GPIO.output(bonus_mmc_out, 0)
+            GPIO.output(bonus_elt_out, 0)
+            GPIO.output(bonus_aut_out, 0)
+
             # stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
             print(r.status_code)
@@ -355,7 +389,7 @@ def Interrupt_Stop(unused):
                 r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str},
                                    json=dictionary)
             print(r.json())
-            threading.Thread(target=upload, args=(r.json()["id_race"],))
+            # threading.Thread(target=upload, args=(r.json()["id_race"],))
 
 
 def Capteur_Vitesse_1(unused):
@@ -366,8 +400,8 @@ def Capteur_Vitesse_1(unused):
         if capteur_vitesse_1 == 0:
             time_capt_vit_1 = time.perf_counter_ns()
             capteur_vitesse_1 = 1
-            pcf.set_output(14, 0)
-            pcf.set_output(13, 1)
+            GPIO.output(start_barrier, 0)
+            GPIO.output(capt1_barrier, 1)
 
 
 def Capteur_Vitesse_2(unused):
@@ -381,11 +415,11 @@ def Capteur_Vitesse_2(unused):
             capteur_vitesse_2 = 1
             dictionary["speed"] = vitesse
             print(vitesse)
-            pcf.set_output(13, 0)
-            pcf.set_output(12, 1)
+            GPIO.output(capt2_barrier, 0)
+            GPIO.output(sect1_barrier, 1)
 
 
-#					Boucle
+            #					Boucle
 
 GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start, bouncetime=200)
 GPIO.add_event_detect(S2, GPIO.RISING, callback=Interrupt_Stop)
@@ -393,16 +427,20 @@ GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1)
 GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2)
 GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1)
 GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2)
+
+test = QRReader()
 while True:
     pass
+    if run == 0 and Query_ID is None:#si aucune course n'est en cours lire le qr
+        if not test.is_running():
+            test.start_detection()
 
-#     if (run == 0):#si aucune course n'est en cours lire le qr
-#         QR_data = uart.read()
-#         if QR_data != None:
-#             Query_ID = (QR_data[-4:])
-#             bonus_activation(get_bonus(1))
-#             record_start()
-#
-#             print (Query_ID)
+        if test.qr != old_qr and test.qr is not None:
+            old_qr = test.qr
+            Query_ID = test.qr
+            test.stop_detection()
+            bonus_activation(get_bonus(1))
+            #start_record()
+            print (Query_ID)
 
 
