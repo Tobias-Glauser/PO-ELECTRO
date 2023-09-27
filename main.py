@@ -64,6 +64,7 @@ S3 = 6#sect1
 S4 = 5#sect2
 S5 = 19#catp1
 S6 = 13#capt2
+RESET_BTN = 27#bouton reset
 
 start_barrier = 21#signal barrier start
 capt1_barrier = 20#signal barrier capt1
@@ -71,13 +72,14 @@ capt2_barrier = 16#signal barrier capt2
 sect1_barrier = 12#signal barrier sect1
 sect2_barrier = 1#signal barrier sect2
 stop_barrier = 7#signal barrier stop
-bonus_elt_out = 8
-bonus_dcm_out = 25
-bonus_aut_out = 24
-bonus_mmc_out = 23
-signal_run =18
-signal_souffleuse = 17
+bonus_elt_out = 8#bonus ELT
+bonus_dcm_out = 25#bonus DCM
+bonus_aut_out = 24#bonus AUT
+bonus_mmc_out = 23#bonus MMC
+signal_run =18#signal course en cours
+signal_souffleuse = 17#signal pour la souffleuse
 
+###################initialisation des GPIO###################
 GPIO.setup(start_barrier, GPIO.OUT)
 GPIO.setup(capt1_barrier, GPIO.OUT)
 GPIO.setup(capt2_barrier, GPIO.OUT)
@@ -90,18 +92,20 @@ GPIO.setup(bonus_aut_out, GPIO.OUT)
 GPIO.setup(bonus_mmc_out, GPIO.OUT)
 GPIO.setup(signal_run, GPIO.OUT)
 GPIO.setup(signal_souffleuse, GPIO.OUT)
-
 GPIO.setup(S1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S5, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S6, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(RESET_BTN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
 Query_ID = None
 penalitee = 0#En milliseconds
 temps_final = 0
 distance = 50#distance en mm entre les deux capteurs pour la vitesse
 
+###################connection avec les informaticiens###################
 res = requests.post(jelastic_api + "authentication/section/", json=authentification)
 print(res.json())
 authentification["token"] = res.json()["token"]
@@ -110,7 +114,7 @@ token_str = "Bearer " + str(authentification["token"])
 print(token_str)
 
 
-#					Timers
+###################Timers###################
 def runtime_handler():  # Timer 10ms
     global uart_chrono, actualTick, actualTime, StartTick
     actualTick = time.perf_counter_ns()
@@ -137,10 +141,11 @@ def runtime_handler_chrono():  # Timer 100ms
         timer_fin += 1
         if 30 < timer_fin < penalitee/100 + 30:
             temps_final += 1
-            uart_chrono.write(temps_final)
+            uart_chrono.write("{:04d}".format(temps_final).encode('utf-8'))
         if timer_fin > 100:
             run = 0  # course terminée
             timer_fin = 0
+            penalitee = 0
             fin = 0
             Query_ID = None
             GPIO.output(start_barrier, 1)
@@ -149,7 +154,7 @@ def runtime_handler_chrono():  # Timer 100ms
             print('fin')
 
 
-#					calcul de l'heure de fin de course
+###################calcul de l'heure des passages aux barrières###################
 def final_hour(a):
     global ms_start, time_finish_ms, ms_finish, s_finish, h_finish, m_finish
     time_finish_ms = a + ms_start
@@ -158,8 +163,6 @@ def final_hour(a):
     m_finish = (time_finish_ms // (1000 * 60)) % 60
     h_finish = (time_finish_ms // (1000 * 60 * 60)) % 24
 
-
-#					calcul de l'heure de fin du secteur 1
 def secteur1_hour(a):
     global ms_sect1, time_sect1_ms, s_sect1, m_sect1, h_sect1, ms_start
     time_sect1_ms = a + ms_start
@@ -168,7 +171,6 @@ def secteur1_hour(a):
     m_sect1 = (time_sect1_ms // (1000 * 60)) % 60
     h_sect1 = (time_sect1_ms // (1000 * 60 * 60)) % 24
 
-#					calcul de l'heure de fin du secteur 2
 def secteur2_hour(a):
     global ms_sect2, time_sect2_ms, s_sect2, m_sect2, h_sect2, ms_start
     time_sect2_ms = a + ms_start
@@ -178,7 +180,7 @@ def secteur2_hour(a):
     h_sect2 = (time_sect2_ms // (1000 * 60 * 60)) % 24
 
 
-#					Fonction enregistrement
+###################Fonctions d'enregistrement de la vidéo###################
 def start_record():
     res = requests.get(obs_api + "start")
     print(res)
@@ -203,7 +205,7 @@ def upload(id):
     res = requests.get(obs_api + "upload/" + str(id))
     print(res)
 
-
+###################Fonctions de reconnaissance de la voiture###################
 def get_id_car(Query_ID):
     res = requests.get(jelastic_api + "car/query-id/" + Query_ID)
     print(res)
@@ -227,7 +229,7 @@ def bonus_activation(bonus):
     global penalitee
     if 1 not in bonus:
         #activation bonus informaticiens
-        penalitee += 2
+        penalitee += 200
         print('bonus1')
     if 2 in bonus:
          #activation bonus automaticiens
@@ -243,20 +245,24 @@ def bonus_activation(bonus):
          print('bonus5')
     if 6 not in bonus:
         #activation bonus laborantins
-        penalitee += 2
+        penalitee += 200
         print('bonus6')
     if 7 in bonus:
          #activation bonus dessinateurs
          GPIO.output(bonus_dcm_out, 1)
          print('bonus7')
 
-#					fonction interrupteur START
+def reset_total(unused):
+    global
+    #stop_record()
+    reboot
+
+###################Fonction Start###################
 def Interrupt_Start(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, dixieme, StartTime, ms_start, run, timer_chrono
-    if interrupt_Sect1 == 0 and fin == 0 and run == 0:
+    global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, StartTime, ms_start, run, timer_chrono
+    if interrupt_Sect1 == 0 and fin == 0 and run == 0 and Query_ID is not None:
         interrupt_Stop = 0
         if interrupt_Start == 0:
-            dixieme = 0
             run = 1
             StartTime = time.localtime()
             ms_start = ((StartTime.tm_hour * 3600000) + (StartTime.tm_min * 60000) + (StartTime.tm_sec * 1000))
@@ -272,13 +278,12 @@ def Interrupt_Start(unused):
             print(dictionary)
             print("\nStart: ", end='\t')
             print(Start_Hour)
-            # start_record()
             GPIO.output(signal_run, 1)
             GPIO.output(start_barrier, 0)
             GPIO.output(capt1_barrier, 1)
 
 
-#					fonction interrupteur SECTEUR 1
+###################Fonction Secteur 1###################
 def Interrupt_Sect1(unused):
     global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_vitesse_2, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause, StartTime
     if capteur_vitesse_2 == 1:
@@ -313,7 +318,7 @@ def Interrupt_Sect1(unused):
 
 
 
-#					fonction interrupteur SECTEUR 2
+###################Fonction Secteur 2###################
 def Interrupt_Sect2(unused):
     global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause
     if interrupt_Sect1 == 1:
@@ -340,7 +345,7 @@ def Interrupt_Sect2(unused):
             # plan3_record()
 
 
-#					fonction interrupteur STOP
+###################Fonction Stop###################
 def Interrupt_Stop(unused):
     global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, StopTick, pause, TotalTime, StartTick, timer_chrono, soft_timer, StopTime, run, authentification, token_str, ms_finish, actualTime, fin
     if interrupt_Sect2 == 1:
@@ -391,7 +396,7 @@ def Interrupt_Stop(unused):
             print(r.json())
             # threading.Thread(target=upload, args=(r.json()["id_race"],))
 
-
+###################Fonction premier capteur de vitesse###################
 def Capteur_Vitesse_1(unused):
     global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_vitesse_1, actualTime, time_capt_vit_1
     if interrupt_Start == 1:
@@ -403,7 +408,7 @@ def Capteur_Vitesse_1(unused):
             GPIO.output(start_barrier, 0)
             GPIO.output(capt1_barrier, 1)
 
-
+###################Fonction deuxieme capteur de vitesse###################
 def Capteur_Vitesse_2(unused):
     global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_vitesse_1, capteur_vitesse_2, actualTime, time_capt_vit_1
     if capteur_vitesse_1 == 1:
@@ -418,21 +423,20 @@ def Capteur_Vitesse_2(unused):
             GPIO.output(capt2_barrier, 0)
             GPIO.output(sect1_barrier, 1)
 
-
-            #					Boucle
-
+###################Détection de flancs montants (barrières lumineuses)###################
 GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start, bouncetime=200)
-GPIO.add_event_detect(S2, GPIO.RISING, callback=Interrupt_Stop)
-GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1)
-GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2)
-GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1)
-GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2)
+GPIO.add_event_detect(S2, GPIO.RISING, callback=Interrupt_Stop, bouncetime=200)
+GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1, bouncetime=200)
+GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2, bouncetime=200)
+GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1, bouncetime=200)
+GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2, bouncetime=200)
+GPIO.add_event_detect(RESET_BTN, GPIO.RISING, callback = reset_total, bouncetime=200)
 
 test = QRReader()
+
 while True:
-    pass
     if run == 0 and Query_ID is None:#si aucune course n'est en cours lire le qr
-        if not test.is_running():
+        if not test.is_running():#si il n'est pas déja en train d'essayer de lire un qr, commencer la lecture
             test.start_detection()
 
         if test.qr != old_qr and test.qr is not None:
