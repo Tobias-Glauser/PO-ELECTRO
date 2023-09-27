@@ -10,8 +10,7 @@ from PIL import Image
 
 class QRReader:
     qr = None
-    cam = cv2.VideoCapture(0)
-    qcd = cv2.QRCodeDetector()
+    cam = None
     running = False
 
     def __init__(self):
@@ -22,10 +21,12 @@ class QRReader:
         return self.qr
 
     def start_detection(self):
+        self.cam = cv2.VideoCapture(0)
         self.running = True
         self.timer = RepeatedTimer(0.2, self.read)
 
     def stop_detection(self):
+        self.cam.release()
         self.timer.stop()
         self.running = False
 

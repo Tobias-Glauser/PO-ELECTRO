@@ -1,4 +1,6 @@
+import sys
 import time
+import os
 import serial
 import RPi.GPIO as GPIO
 import requests
@@ -253,9 +255,14 @@ def bonus_activation(bonus):
          print('bonus7')
 
 def reset_total(unused):
-    global
-    #stop_record()
-    reboot
+    global test
+    try:
+        #stop_record()
+        test.stop_detection()
+    except Exception as e:
+        print(e)
+
+    os.execv(sys.executable, ['python'] + sys.argv)
 
 ###################Fonction Start###################
 def Interrupt_Start(unused):
@@ -433,17 +440,25 @@ GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2, bouncetime=20
 GPIO.add_event_detect(RESET_BTN, GPIO.RISING, callback = reset_total, bouncetime=200)
 
 test = QRReader()
+try:
+    #stop_record()
+    pass
+except Exception as e:
+    print(e)
+
 
 while True:
     if run == 0 and Query_ID is None:#si aucune course n'est en cours lire le qr
         if not test.is_running():#si il n'est pas déja en train d'essayer de lire un qr, commencer la lecture
             test.start_detection()
+            #allumer retroéclairage
 
         if test.qr != old_qr and test.qr is not None:
             old_qr = test.qr
             Query_ID = test.qr
             test.stop_detection()
             bonus_activation(get_bonus(1))
+            #eteindre
             #start_record()
             print (Query_ID)
 
