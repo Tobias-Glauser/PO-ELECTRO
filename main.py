@@ -61,7 +61,7 @@ time_capt_vit_1 = 0
 soft_timer = None
 GPIO.setmode(GPIO.BCM)
 S1 = 26#start
-S2 = 0#stop
+S2 = 11#stop
 S3 = 6#sect1
 S4 = 5#sect2
 S5 = 19#catp1
@@ -204,6 +204,8 @@ def stop_record():
 
 
 def upload(id):
+    print("alkdfjsdalkfjs")
+    # print("id : " + str(id))
     res = requests.get(obs_api + "upload/" + str(id))
     print(res)
 
@@ -257,7 +259,7 @@ def bonus_activation(bonus):
 def reset_total(unused):
     global test
     try:
-        #stop_record()
+        stop_record()
         test.stop_detection()
     except Exception as e:
         print(e)
@@ -319,7 +321,7 @@ def Interrupt_Sect1(unused):
                 GPIO.output(signal_souffleuse, 1)
                 GPIO.output(sect1_barrier, 0)
                 GPIO.output(sect2_barrier, 1)
-                # plan2_record()
+                plan2_record()
             except Exception as e:
                 print('erreur', e)
 
@@ -349,7 +351,7 @@ def Interrupt_Sect2(unused):
             print(dictionary)
             GPIO.output(sect2_barrier, 0)
             GPIO.output(stop_barrier, 1)
-            # plan3_record()
+            plan3_record()
 
 
 ###################Fonction Stop###################
@@ -363,14 +365,10 @@ def Interrupt_Stop(unused):
             interrupt_Stop = 1
             StopTick = time.perf_counter_ns()
             TotalTime = (StopTick - StartTick) // 1000000
-            print(StopTick)
-            print(StartTick)
-            print(TotalTime)
             soft_timer.stop()
             final_hour(TotalTime + penalitee)
             if ((ms_finish % 10) >= 5):
                 actualTime += 1
-            print(actualTime)
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             print("Stop: ", end='\t')
@@ -390,7 +388,7 @@ def Interrupt_Stop(unused):
             GPIO.output(bonus_elt_out, 0)
             GPIO.output(bonus_aut_out, 0)
 
-            # stop_record()
+            stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
             print(r.status_code)
             print(token_str)
@@ -401,7 +399,9 @@ def Interrupt_Stop(unused):
                 r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str},
                                    json=dictionary)
             print(r.json())
-            # threading.Thread(target=upload, args=(r.json()["id_race"],))
+            thread = threading.Thread(target=upload, args=(r.json()["id_race"],))
+            thread.start()
+
 
 ###################Fonction premier capteur de vitesse###################
 def Capteur_Vitesse_1(unused):
@@ -441,7 +441,7 @@ GPIO.add_event_detect(RESET_BTN, GPIO.RISING, callback = reset_total, bouncetime
 
 test = QRReader()
 try:
-    #stop_record()
+    stop_record()
     pass
 except Exception as e:
     print(e)
@@ -458,8 +458,8 @@ while True:
             Query_ID = test.qr
             test.stop_detection()
             bonus_activation(get_bonus(1))
-            #eteindre
-            #start_record()
+            #eteindre retroéclairage
+            start_record()
             print (Query_ID)
 
 
