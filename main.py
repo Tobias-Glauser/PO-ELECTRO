@@ -60,26 +60,27 @@ timer_pause = 0
 time_capt_vit_1 = 0
 soft_timer = None
 GPIO.setmode(GPIO.BCM)
-S1 = 26#start
-S2 = 11#stop
+S1 = 9#start
+S2 = 19#stop
 S3 = 6#sect1
-S4 = 5#sect2
-S5 = 19#catp1
-S6 = 13#capt2
-RESET_BTN = 27#bouton reset
+S4 = 13#sect2
+S5 = 11#catp1
+S6 = 5#capt2
+RESET_BTN = 18#bouton reset
 
-start_barrier = 21#signal barrier start
-capt1_barrier = 20#signal barrier capt1
-capt2_barrier = 16#signal barrier capt2
-sect1_barrier = 12#signal barrier sect1
-sect2_barrier = 1#signal barrier sect2
-stop_barrier = 7#signal barrier stop
-bonus_elt_out = 8#bonus ELT
+start_barrier = 10#signal barrier start
+capt1_barrier = 22#signal barrier capt1
+capt2_barrier = 27#signal barrier capt2
+sect1_barrier = 17#signal barrier sect1
+sect2_barrier = 4#signal barrier sect2
+stop_barrier = 3#signal barrier stop
+bonus_elt_out = 24#bonus ELT
 bonus_dcm_out = 25#bonus DCM
-bonus_aut_out = 24#bonus AUT
-bonus_mmc_out = 23#bonus MMC
-signal_run =18#signal course en cours
-signal_souffleuse = 17#signal pour la souffleuse
+bonus_aut_out = 8#bonus AUT
+bonus_mmc_out = 7#bonus MMC
+signal_run =1#signal course en cours
+signal_souffleuse = 12#signal pour la souffleuse
+signal_led = 20#signal pour le scan QR
 
 ###################initialisation des GPIO###################
 GPIO.setup(start_barrier, GPIO.OUT)
@@ -94,6 +95,7 @@ GPIO.setup(bonus_aut_out, GPIO.OUT)
 GPIO.setup(bonus_mmc_out, GPIO.OUT)
 GPIO.setup(signal_run, GPIO.OUT)
 GPIO.setup(signal_souffleuse, GPIO.OUT)
+GPIO.setup(signal_led, GPIO.OUT)
 GPIO.setup(S1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -118,7 +120,7 @@ print(token_str)
 
 ###################Timers###################
 def runtime_handler():  # Timer 10ms
-    global uart_chrono, actualTick, actualTime, StartTick
+    global uart_chrono, actualTick, actualTime,     StartTick
     actualTick = time.perf_counter_ns()
     actualTime = (actualTick - StartTick) // 10000000
     # print (str(actualTime))
@@ -128,7 +130,7 @@ def runtime_handler_chrono():  # Timer 100ms
     global actualTick, actualTick, actualTime, StartTick, timer_pause, pause, fin, timer_fin, penalitee, temps_final, run, Query_ID
     if pause == 1:
         timer_pause += 1
-        if timer_pause > 20:
+        if timer_pause > 10:
             timer_pause = 0
             pause = 0
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
@@ -136,14 +138,17 @@ def runtime_handler_chrono():  # Timer 100ms
                 GPIO.output(signal_souffleuse, 0)
 
     if pause == 0 and fin == 0:
-        temps_final = actualTime
+        print("---------------" + str(actualTime))
         uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
+        temps_final = actualTime
 
     if fin == 1:
         timer_fin += 1
-        if 30 < timer_fin < penalitee/100 + 30:
-            temps_final += 1
+        print(penalitee, timer_fin, temps_final)
+        if 30 <= timer_fin <= penalitee/100 + 30:
+            print("JAMBON-BEURRE")
             uart_chrono.write("{:04d}".format(temps_final).encode('utf-8'))
+            temps_final += 10
         if timer_fin > 100:
             run = 0  # course terminée
             timer_fin = 0
@@ -233,7 +238,7 @@ def bonus_activation(bonus):
     global penalitee
     if 1 not in bonus:
         #activation bonus informaticiens
-        penalitee += 200
+        penalitee += 2000
         print('bonus1')
     if 2 in bonus:
          #activation bonus automaticiens
@@ -249,7 +254,7 @@ def bonus_activation(bonus):
          print('bonus5')
     if 6 not in bonus:
         #activation bonus laborantins
-        penalitee += 200
+        penalitee += 2000
         print('bonus6')
     if 7 in bonus:
          #activation bonus dessinateurs
@@ -259,7 +264,7 @@ def bonus_activation(bonus):
 def reset_total(unused):
     global test
     try:
-        stop_record()
+        # stop_record()
         test.stop_detection()
     except Exception as e:
         print(e)
@@ -321,7 +326,7 @@ def Interrupt_Sect1(unused):
                 GPIO.output(signal_souffleuse, 1)
                 GPIO.output(sect1_barrier, 0)
                 GPIO.output(sect2_barrier, 1)
-                plan2_record()
+                # plan2_record()
             except Exception as e:
                 print('erreur', e)
 
@@ -329,7 +334,7 @@ def Interrupt_Sect1(unused):
 
 ###################Fonction Secteur 2###################
 def Interrupt_Sect2(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause
+    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, StopTick, TotalTime, StartTick, penalitee, soft_timer, StopTime, timer_chrono, timer_pause, pause
     if interrupt_Sect1 == 1:
         interrupt_Sect1 = 0
         if (interrupt_Sect2 == 0):
@@ -351,17 +356,16 @@ def Interrupt_Sect2(unused):
             print(dictionary)
             GPIO.output(sect2_barrier, 0)
             GPIO.output(stop_barrier, 1)
-            plan3_record()
+            # plan3_record()
 
 
 ###################Fonction Stop###################
 def Interrupt_Stop(unused):
-    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, StopTick, pause, TotalTime, StartTick, timer_chrono, soft_timer, StopTime, run, authentification, token_str, ms_finish, actualTime, fin
+    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, StopTick, pause,temps_final, TotalTime, StartTick, timer_chrono, soft_timer, StopTime, run, authentification, token_str, ms_finish, actualTime, fin
     if interrupt_Sect2 == 1:
         interrupt_Sect2 = 0
         if interrupt_Stop == 0:
             pause = 0
-            fin = 1
             interrupt_Stop = 1
             StopTick = time.perf_counter_ns()
             TotalTime = (StopTick - StartTick) // 1000000
@@ -369,8 +373,11 @@ def Interrupt_Stop(unused):
             final_hour(TotalTime + penalitee)
             if ((ms_finish % 10) >= 5):
                 actualTime += 1
+
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
+            temps_final = actualTime
+            fin = 1
             print("Stop: ", end='\t')
             Finish_Hour = (
                 "{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
@@ -388,7 +395,7 @@ def Interrupt_Stop(unused):
             GPIO.output(bonus_elt_out, 0)
             GPIO.output(bonus_aut_out, 0)
 
-            stop_record()
+            # stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
             print(r.status_code)
             print(token_str)
@@ -441,7 +448,7 @@ GPIO.add_event_detect(RESET_BTN, GPIO.RISING, callback = reset_total, bouncetime
 
 test = QRReader()
 try:
-    stop_record()
+    # stop_record()
     pass
 except Exception as e:
     print(e)
@@ -451,15 +458,15 @@ while True:
     if run == 0 and Query_ID is None:#si aucune course n'est en cours lire le qr
         if not test.is_running():#si il n'est pas déja en train d'essayer de lire un qr, commencer la lecture
             test.start_detection()
-            #allumer retroéclairage
+            GPIO.output(signal_led, 1)
 
         if test.qr != old_qr and test.qr is not None:
             old_qr = test.qr
             Query_ID = test.qr
             test.stop_detection()
             bonus_activation(get_bonus(1))
-            #eteindre retroéclairage
-            start_record()
+            GPIO.output(signal_led, 0)
+            # start_record()
             print (Query_ID)
 
 
