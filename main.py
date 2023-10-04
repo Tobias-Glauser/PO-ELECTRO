@@ -17,10 +17,15 @@ obs_api = 'http://192.168.1.100/obs/'
 
 #					Initialisation UART pour le chrono
 
-uart_chrono = serial.Serial('/dev/ttyAMA0', 9600, parity=serial.PARITY_NONE,
+uart_chrono = serial.Serial('/dev/serial0', 9600, parity=serial.PARITY_NONE,
   stopbits=serial.STOPBITS_ONE,
   bytesize=serial.EIGHTBITS,
   timeout=1)
+
+while True:
+    uart_chrono.write("clrr".encode('utf-8'))
+    time.sleep(0.1)
+    print("ttrd")
 
 #                   Données à transférer
 dictionary = {
@@ -142,7 +147,7 @@ def runtime_handler_chrono():  # Timer 100ms
                 GPIO.output(signal_souffleuse, 0)
 
     if pause == 0 and fin == 0:
-        #print("---------------" + str(actualTime))
+        print("---------------" + str(actualTime))
         uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
         temps_final = actualTime
 
