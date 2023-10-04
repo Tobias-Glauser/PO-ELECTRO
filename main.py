@@ -62,17 +62,16 @@ soft_timer = None
 GPIO.setmode(GPIO.BCM)
 S1 = 9#start
 S2 = 19#stop
-S3 = 6#sect1
-S4 = 13#sect2
+S3 = 5#sect1
+S4 = 6#sect2
 S5 = 11#catp1
-S6 = 5#capt2
+S6 = 13#capt2
 RESET_BTN = 18#bouton reset
 
 start_barrier = 10#signal barrier start
 capt1_barrier = 22#signal barrier capt1
-capt2_barrier = 27#signal barrier capt2
-sect1_barrier = 17#signal barrier sect1
-sect2_barrier = 4#signal barrier sect2
+sect1_barrier = 27#signal barrier sect1
+sect2_barrier = 17#signal barrier sect2
 stop_barrier = 3#signal barrier stop
 bonus_elt_out = 24#bonus ELT
 bonus_dcm_out = 25#bonus DCM
@@ -85,7 +84,6 @@ signal_led = 20#signal pour le scan QR
 ###################initialisation des GPIO###################
 GPIO.setup(start_barrier, GPIO.OUT)
 GPIO.setup(capt1_barrier, GPIO.OUT)
-GPIO.setup(capt2_barrier, GPIO.OUT)
 GPIO.setup(sect1_barrier, GPIO.OUT)
 GPIO.setup(sect2_barrier, GPIO.OUT)
 GPIO.setup(stop_barrier, GPIO.OUT)
@@ -102,12 +100,13 @@ GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S5, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S6, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(RESET_BTN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(RESET_BTN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 Query_ID = None
 penalitee = 0#En milliseconds
 temps_final = 0
 distance = 50#distance en mm entre les deux capteurs pour la vitesse
+
 
 ###################connection avec les informaticiens###################
 res = requests.post(jelastic_api + "authentication/section/", json=authentification)
@@ -117,6 +116,11 @@ print(authentification["token"])
 token_str = "Bearer " + str(authentification["token"])
 print(token_str)
 
+GPIO.output(start_barrier, 1)
+GPIO.output(capt1_barrier, 1)
+GPIO.output(sect2_barrier, 1)
+GPIO.output(sect1_barrier, 1)
+GPIO.output(stop_barrier, 1)
 
 ###################Timers###################
 def runtime_handler():  # Timer 10ms
@@ -138,7 +142,7 @@ def runtime_handler_chrono():  # Timer 100ms
                 GPIO.output(signal_souffleuse, 0)
 
     if pause == 0 and fin == 0:
-        print("---------------" + str(actualTime))
+        #print("---------------" + str(actualTime))
         uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
         temps_final = actualTime
 
@@ -155,8 +159,8 @@ def runtime_handler_chrono():  # Timer 100ms
             penalitee = 0
             fin = 0
             Query_ID = None
-            GPIO.output(start_barrier, 1)
-            timer_chrono.stop()
+            # GPIO.output(start_barrier, 1)
+            # timer_chrono.stop()
             uart_chrono.write("rien".encode('utf-8'))
             print('fin')
 
@@ -294,8 +298,8 @@ def Interrupt_Start(unused):
             print("\nStart: ", end='\t')
             print(Start_Hour)
             GPIO.output(signal_run, 1)
-            GPIO.output(start_barrier, 0)
-            GPIO.output(capt1_barrier, 1)
+            # GPIO.output(start_barrier, 0)
+            # GPIO.output(capt1_barrier, 1)
 
 
 ###################Fonction Secteur 1###################
@@ -325,8 +329,8 @@ def Interrupt_Sect1(unused):
                 dictionary["sector1"] = Sect1_Hour
                 print(dictionary)
                 GPIO.output(signal_souffleuse, 1)
-                GPIO.output(sect1_barrier, 0)
-                GPIO.output(sect2_barrier, 1)
+                # GPIO.output(sect1_barrier, 0)
+                # GPIO.output(sect2_barrier, 1)
                 # plan2_record()
             except Exception as e:
                 print('erreur', e)
@@ -355,8 +359,8 @@ def Interrupt_Sect2(unused):
             print(Sect2_Hour)
             dictionary["sector2"] = Sect2_Hour
             print(dictionary)
-            GPIO.output(sect2_barrier, 0)
-            GPIO.output(stop_barrier, 1)
+            # GPIO.output(sect2_barrier, 0)
+            # GPIO.output(stop_barrier, 1)
             # plan3_record()
 
 
@@ -390,7 +394,7 @@ def Interrupt_Stop(unused):
             dictionary["query_id"] = Query_ID
             print(dictionary)
             soft_timer.stop()
-            GPIO.output(stop_barrier, 0)
+            # GPIO.output(stop_barrier, 0)
             GPIO.output(signal_run, 0)
             GPIO.output(bonus_dcm_out, 0)
             GPIO.output(bonus_mmc_out, 0)
@@ -421,8 +425,6 @@ def Capteur_Vitesse_1(unused):
         if capteur_vitesse_1 == 0:
             time_capt_vit_1 = time.perf_counter_ns()
             capteur_vitesse_1 = 1
-            GPIO.output(start_barrier, 0)
-            GPIO.output(capt1_barrier, 1)
 
 ###################Fonction deuxieme capteur de vitesse###################
 def Capteur_Vitesse_2(unused):
@@ -436,8 +438,7 @@ def Capteur_Vitesse_2(unused):
             capteur_vitesse_2 = 1
             dictionary["speed"] = vitesse
             print(vitesse)
-            GPIO.output(capt2_barrier, 0)
-            GPIO.output(sect1_barrier, 1)
+            # GPIO.output(sect1_barrier, 1)
 
 ###################Détection de flancs montants (barrières lumineuses)###################
 GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start, bouncetime=200)
@@ -446,7 +447,7 @@ GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1, bouncetime=200)
 GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2, bouncetime=200)
 GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1, bouncetime=200)
 GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2, bouncetime=200)
-GPIO.add_event_detect(RESET_BTN, GPIO.RISING, callback = reset_total, bouncetime=200)
+#GPIO.add_event_detect(RESET_BTN, GPIO.FALLING, callback = reset_total, bouncetime=200)
 
 test = QRReader()
 try:
