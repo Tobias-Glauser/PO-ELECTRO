@@ -278,6 +278,7 @@ def Interrupt_Start(unused):
         interrupt_Stop = 0
         if interrupt_Start == 0:
             run = 1
+            uart_chrono.write("run1".encode('utf-8'))
             StartTime = time.localtime()
             ms_start = ((StartTime.tm_hour * 3600000) + (StartTime.tm_min * 60000) + (StartTime.tm_sec * 1000))
             print(str(StartTime.tm_sec))
@@ -374,6 +375,7 @@ def Interrupt_Stop(unused):
             if ((ms_finish % 10) >= 5):
                 actualTime += 1
 
+            uart_chrono.write("run2".encode('utf-8'))
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             temps_final = actualTime
