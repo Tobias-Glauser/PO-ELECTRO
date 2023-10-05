@@ -452,7 +452,7 @@ GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1, bouncetime=200)
 GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2, bouncetime=200)
 GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1, bouncetime=200)
 GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2, bouncetime=200)
-#GPIO.add_event_detect(RESET_BTN, GPIO.FALLING, callback = reset_total, bouncetime=200)
+GPIO.add_event_detect(RESET_BTN, GPIO.FALLING, callback = reset_total, bouncetime=200)
 
 test = QRReader()
 try:
@@ -460,7 +460,6 @@ try:
     pass
 except Exception as e:
     print(e)
-
 
 while True:
     if run == 0 and Query_ID is None:#si aucune course n'est en cours lire le qr
