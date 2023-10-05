@@ -139,6 +139,7 @@ def runtime_handler_chrono():  # Timer 100ms
         if timer_pause > 10:
             timer_pause = 0
             pause = 0
+            uart_chrono.write("run1".encode('utf-8'))
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
             if interrupt_Sect1 == 1:
                 GPIO.output(signal_souffleuse, 0)
@@ -315,6 +316,7 @@ def Interrupt_Sect1(unused):
                 secteur1_hour(Time_Sect1)
                 timer_pause = 0
                 pause = 1
+                uart_chrono.write("run2".encode('utf-8'))
                 uart_chrono.write("clrg".encode('utf-8'))#envoie couleur Green
                 uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
                 print(str(h_sect1),str(m_sect1), str(s_sect1),str(ms_sect1))
@@ -349,6 +351,7 @@ def Interrupt_Sect2(unused):
             secteur2_hour(Time_Sect2)
             timer_pause = 0
             pause = 1
+            uart_chrono.write("run2".encode('utf-8'))
             uart_chrono.write("clrg".encode('utf-8'))#envoie couleur Green
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             Sect2_Hour = ("{:4}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z".format(str(StartTime.tm_year), str(StartTime.tm_mon),
@@ -380,7 +383,7 @@ def Interrupt_Stop(unused):
                 actualTime += 1
 
             uart_chrono.write("run2".encode('utf-8'))
-            uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
+            uart_chrono.write("clro".encode('utf-8'))#envoie couleur Red
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             temps_final = actualTime
             fin = 1
