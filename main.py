@@ -384,7 +384,7 @@ def Interrupt_Stop(unused):
                 actualTime += 1
 
             uart_chrono.write("run2".encode('utf-8'))
-            uart_chrono.write("clro".encode('utf-8'))#envoie couleur Red
+            uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
             uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
             temps_final = actualTime
             fin = 1
