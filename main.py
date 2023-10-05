@@ -22,10 +22,11 @@ uart_chrono = serial.Serial('/dev/serial0', 9600, parity=serial.PARITY_NONE,
   bytesize=serial.EIGHTBITS,
   timeout=1)
 
-while True:
-    uart_chrono.write("clrr".encode('utf-8'))
-    time.sleep(0.1)
-    print("ttrd")
+# while True:
+#     uart_chrono.write("0234".encode('utf-8'))
+#
+#     time.sleep(0.1)
+#     print("ttrd")
 
 #                   Données à transférer
 dictionary = {
