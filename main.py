@@ -106,7 +106,7 @@ GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S5, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S6, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(RESET_BTN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(RESET_BTN, GPIO.IN)
 
 Query_ID = None
 penalitee = 0#En milliseconds
@@ -139,7 +139,12 @@ def runtime_handler():  # Timer 10ms
 
 
 def runtime_handler_chrono():  # Timer 100ms
-    global actualTick, actualTick, actualTime, StartTick, timer_pause, pause, fin, timer_fin, penalitee, temps_final, run, Query_ID
+    global actualTick, actualTick, actualTime, StartTick, timer_pause, pause, fin, timer_fin, penalitee, temps_final, run, Query_ID, fatigue, timer_chrono
+
+    fatigue += 1
+    if fatigue > 500 :
+        fatigue = 0
+
     if pause == 1:
         timer_pause += 1
         if timer_pause > 10:
@@ -276,7 +281,7 @@ def bonus_activation(bonus):
 def reset_total(unused):
     global test
     try:
-        # stop_record()
+        stop_record()
         test.stop_detection()
     except Exception as e:
         print(e)
@@ -285,8 +290,9 @@ def reset_total(unused):
 
 ###################Fonction Start###################
 def Interrupt_Start(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, StartTime, ms_start, run, timer_chrono
+    global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, StartTime, ms_start, run, fatigue
     if interrupt_Sect1 == 0 and fin == 0 and run == 0 and Query_ID is not None:
+        fatigue = 0
         interrupt_Stop = 0
         if interrupt_Start == 0:
             run = 1
@@ -312,8 +318,9 @@ def Interrupt_Start(unused):
 
 ###################Fonction Secteur 1###################
 def Interrupt_Sect1(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_vitesse_2, StopTick, TotalTime, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause, StartTime
-    if capteur_vitesse_2 == 1:
+    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, capteur_vitesse_2, StopTick, TotalTime, fatigue, StartTick, soft_timer, StopTime, timer_chrono, timer_pause, pause, StartTime
+    if capteur_vitesse_2 == 1 and fatigue > 20:
+        fatigue = 0
         capteur_vitesse_2 = 0
         if interrupt_Sect1 == 0:
             try:
@@ -340,7 +347,7 @@ def Interrupt_Sect1(unused):
                 GPIO.output(signal_souffleuse, 1)
                 GPIO.output(sect1_barrier, 0)
                 GPIO.output(stop_barrier, 1)
-                # plan2_record()
+                plan2_record()
             except Exception as e:
                 print('erreur', e)
 
@@ -348,8 +355,9 @@ def Interrupt_Sect1(unused):
 
 ###################Fonction Secteur 2###################
 def Interrupt_Sect2(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, StopTick, TotalTime, StartTick, penalitee, soft_timer, StopTime, timer_chrono, timer_pause, pause
-    if interrupt_Sect1 == 1:
+    global interrupt_Start, interrupt_Stop, interrupt_Sect2, interrupt_Sect1, StopTick, TotalTime, fatigue, StartTick, penalitee, soft_timer, StopTime, timer_chrono, timer_pause, pause
+    if interrupt_Sect1 == 1 and fatigue > 20:
+        fatigue = 0
         interrupt_Sect1 = 0
         if (interrupt_Sect2 == 0):
             Sect2_Tick = time.perf_counter_ns()
@@ -370,13 +378,14 @@ def Interrupt_Sect2(unused):
             dictionary["sector2"] = Sect2_Hour
             print(dictionary)
             GPIO.output(sect2_barrier, 0)
-            # plan3_record()
+            plan3_record()
 
 
 ###################Fonction Stop###################
 def Interrupt_Stop(unused):
-    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, StopTick, pause,temps_final, TotalTime, StartTick, timer_chrono, soft_timer, StopTime, run, authentification, token_str, ms_finish, actualTime, fin
-    if interrupt_Sect2 == 1:
+    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, fatigue, interrupt_Stop, StopTick, pause,temps_final, TotalTime, StartTick, timer_chrono, soft_timer, StopTime, run, authentification, token_str, ms_finish, actualTime, fin
+    if interrupt_Sect2 == 1 and fatigue > 5:
+        fatigue = 0
         interrupt_Sect2 = 0
         if interrupt_Stop == 0:
             pause = 0
@@ -413,7 +422,7 @@ def Interrupt_Stop(unused):
             GPIO.output(bonus_elt_out, 0)
             GPIO.output(bonus_aut_out, 0)
 
-            # stop_record()
+            stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
             print(r.status_code)
             print(token_str)
@@ -430,11 +439,12 @@ def Interrupt_Stop(unused):
 
 ###################Fonction premier capteur de vitesse###################
 def Capteur_Vitesse_1(unused):
-    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_vitesse_1, actualTime, time_capt_vit_1
-    if interrupt_Start == 1:
+    global interrupt_Start, interrupt_Sect1, interrupt_Sect2, interrupt_Stop, capteur_vitesse_1, actualTime, time_capt_vit_1, fatigue
+    if interrupt_Start == 1 and fatigue > 5:
         interrupt_Start = 0
         print(capteur_vitesse_1)
         if capteur_vitesse_1 == 0:
+            fatigue = 0
             time_capt_vit_1 = time.perf_counter_ns()
             capteur_vitesse_1 = 1
 
@@ -465,7 +475,7 @@ GPIO.add_event_detect(RESET_BTN, GPIO.FALLING, callback = reset_total, bouncetim
 
 test = QRReader()
 try:
-    # stop_record()
+    stop_record()
     pass
 except Exception as e:
     print(e)
@@ -478,12 +488,11 @@ while True:
 
         if test.qr != old_qr and test.qr is not None:
 
-            GPIO.output(signal_run, 1)
             old_qr = test.qr
             test.stop_detection()
             bonus_activation(get_bonus(1))
             GPIO.output(signal_led, 0)
-            # start_record()
+            start_record()
             Query_ID = test.qr
             print (Query_ID)
 
