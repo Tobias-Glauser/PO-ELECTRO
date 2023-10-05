@@ -122,8 +122,13 @@ print(authentification["token"])
 token_str = "Bearer " + str(authentification["token"])
 print(token_str)
 
+
+GPIO.output(sect2_barrier, 1)
 GPIO.output(start_barrier, 1)
 GPIO.output(capt1_barrier, 1)
+GPIO.output(signal_souffleuse, 0)
+GPIO.output(bonus_aut_out, 0)
+GPIO.output(signal_run, 0)
 
 ###################Timers###################
 def runtime_handler():  # Timer 10ms
@@ -146,18 +151,17 @@ def runtime_handler_chrono():  # Timer 100ms
                 GPIO.output(signal_souffleuse, 0)
 
     if pause == 0 and fin == 0:
-        print("---------------" + str(actualTime))
+        # print("---------------" + str(actualTime))
         uart_chrono.write("{:04d}".format(actualTime).encode('utf-8'))
         temps_final = actualTime
 
     if fin == 1:
         timer_fin += 1
-        print(penalitee, timer_fin, temps_final)
+        # print(penalitee, timer_fin, temps_final)
         if 30 <= timer_fin <= penalitee/100 + 30:
             uart_chrono.write("{:04d}".format(temps_final).encode('utf-8'))
             temps_final += 10
         if timer_fin > 100:
-            GPIO.output(start_barrier, 1)
             run = 0  # course terminée
             timer_fin = 0
             penalitee = 0
@@ -165,6 +169,8 @@ def runtime_handler_chrono():  # Timer 100ms
             Query_ID = None
             uart_chrono.write("rien".encode('utf-8'))
             print('fin')
+            GPIO.output(start_barrier, 1)
+            GPIO.output(capt1_barrier, 1)
             timer_chrono.stop()
 
 
@@ -364,7 +370,6 @@ def Interrupt_Sect2(unused):
             dictionary["sector2"] = Sect2_Hour
             print(dictionary)
             GPIO.output(sect2_barrier, 0)
-            # GPIO.output(stop_barrier, 1)
             # plan3_record()
 
 
@@ -399,6 +404,9 @@ def Interrupt_Stop(unused):
             print(dictionary)
             soft_timer.stop()
             GPIO.output(stop_barrier, 0)
+            GPIO.output(sect2_barrier, 0)
+            GPIO.output(sect1_barrier, 0)
+            GPIO.output(capt1_barrier, 0)
             GPIO.output(signal_run, 0)
             GPIO.output(bonus_dcm_out, 0)
             GPIO.output(bonus_mmc_out, 0)
@@ -445,6 +453,7 @@ def Capteur_Vitesse_2(unused):
             GPIO.output(capt1_barrier, 0)
             GPIO.output(sect2_barrier, 1)
 
+
 ###################Détection de flancs montants (barrières lumineuses)###################
 GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start, bouncetime=200)
 GPIO.add_event_detect(S2, GPIO.RISING, callback=Interrupt_Stop, bouncetime=200)
@@ -468,7 +477,8 @@ while True:
             GPIO.output(signal_led, 1)
 
         if test.qr != old_qr and test.qr is not None:
-            GPIO.output(capt1_barrier, 1)
+
+            GPIO.output(signal_run, 1)
             old_qr = test.qr
             test.stop_detection()
             bonus_activation(get_bonus(1))
