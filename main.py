@@ -123,9 +123,6 @@ print(token_str)
 
 GPIO.output(start_barrier, 1)
 GPIO.output(capt1_barrier, 1)
-GPIO.output(sect2_barrier, 1)
-GPIO.output(sect1_barrier, 1)
-GPIO.output(stop_barrier, 1)
 
 ###################Timers###################
 def runtime_handler():  # Timer 10ms
@@ -302,7 +299,7 @@ def Interrupt_Start(unused):
             print(Start_Hour)
             GPIO.output(signal_run, 1)
             GPIO.output(start_barrier, 0)
-            # GPIO.output(capt1_barrier, 1)
+            GPIO.output(sect1_barrier, 1)
 
 
 ###################Fonction Secteur 1###################
@@ -333,7 +330,7 @@ def Interrupt_Sect1(unused):
                 print(dictionary)
                 GPIO.output(signal_souffleuse, 1)
                 GPIO.output(sect1_barrier, 0)
-                # GPIO.output(sect2_barrier, 1)
+                GPIO.output(stop_barrier, 1)
                 # plan2_record()
             except Exception as e:
                 print('erreur', e)
@@ -442,6 +439,7 @@ def Capteur_Vitesse_2(unused):
             dictionary["speed"] = vitesse
             print(vitesse)
             GPIO.output(capt1_barrier, 0)
+            GPIO.output(sect2_barrier, 1)
 
 ###################Détection de flancs montants (barrières lumineuses)###################
 GPIO.add_event_detect(S1, GPIO.RISING, callback=Interrupt_Start, bouncetime=200)
@@ -468,9 +466,6 @@ while True:
 
         if test.qr != old_qr and test.qr is not None:
             GPIO.output(capt1_barrier, 1)
-            GPIO.output(sect2_barrier, 1)
-            GPIO.output(sect1_barrier, 1)
-            GPIO.output(stop_barrier, 1)
             old_qr = test.qr
             test.stop_detection()
             bonus_activation(get_bonus(1))
