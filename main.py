@@ -123,7 +123,6 @@ token_str = "Bearer " + str(authentification["token"])
 print(token_str)
 
 
-GPIO.output(sect2_barrier, 1)
 GPIO.output(start_barrier, 1)
 GPIO.output(capt1_barrier, 1)
 GPIO.output(signal_souffleuse, 0)
