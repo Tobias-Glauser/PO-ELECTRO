@@ -63,6 +63,7 @@ TotalTime = 0
 actualTick = 0
 actualTime = 0
 timer_pause = 0
+timer_chrono = 0
 time_capt_vit_1 = 0
 soft_timer = None
 GPIO.setmode(GPIO.BCM)
@@ -79,12 +80,13 @@ capt1_barrier = 22#signal barrier capt1
 sect1_barrier = 27#signal barrier sect1
 sect2_barrier = 17#signal barrier sect2
 stop_barrier = 3#signal barrier stop
-bonus_elt_out = 24#bonus ELT
+bonus_elt_out = 23#bonus ELT
 bonus_dcm_out = 25#bonus DCM
 bonus_aut_out = 8#bonus AUT
 bonus_mmc_out = 7#bonus MMC
 signal_run =1#signal course en cours
 signal_souffleuse = 12#signal pour la souffleuse
+signal_souffleuse2 = 16
 signal_led = 20#signal pour le scan QR
 
 ###################initialisation des GPIO###################
@@ -99,6 +101,7 @@ GPIO.setup(bonus_aut_out, GPIO.OUT)
 GPIO.setup(bonus_mmc_out, GPIO.OUT)
 GPIO.setup(signal_run, GPIO.OUT)
 GPIO.setup(signal_souffleuse, GPIO.OUT)
+GPIO.setup(signal_souffleuse2, GPIO.OUT)
 GPIO.setup(signal_led, GPIO.OUT)
 GPIO.setup(S1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -106,7 +109,7 @@ GPIO.setup(S3, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S5, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(S6, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(RESET_BTN, GPIO.IN)
+GPIO.setup(RESET_BTN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 Query_ID = None
 penalitee = 0#En milliseconds
@@ -126,8 +129,15 @@ print(token_str)
 GPIO.output(start_barrier, 1)
 GPIO.output(capt1_barrier, 1)
 GPIO.output(signal_souffleuse, 0)
+GPIO.output(signal_souffleuse2, 0)
 GPIO.output(bonus_aut_out, 0)
 GPIO.output(signal_run, 0)
+GPIO.output(bonus_dcm_out, 0)
+GPIO.output(bonus_mmc_out, 0)
+GPIO.output(bonus_elt_out, 0)
+GPIO.output(bonus_aut_out, 0)
+
+uart_chrono.write("rien".encode('utf-8'))
 
 ###################Timers###################
 def runtime_handler():  # Timer 10ms
@@ -153,6 +163,7 @@ def runtime_handler_chrono():  # Timer 100ms
             uart_chrono.write("clrr".encode('utf-8'))#envoie couleur Red
             if interrupt_Sect1 == 1:
                 GPIO.output(signal_souffleuse, 0)
+                GPIO.output(signal_souffleuse2, 0)
 
     if pause == 0 and fin == 0:
         # print("---------------" + str(actualTime))
@@ -243,6 +254,7 @@ def get_bonus(id_car):
     print(res, 'test_bonus2')
     json = res.json()
     bonus = []
+    print(res.json())
     for test in json:
         if test['id_section'] not in bonus:
             bonus.append(test['id_section'])
@@ -289,7 +301,7 @@ def reset_total(unused):
 
 ###################Fonction Start###################
 def Interrupt_Start(unused):
-    global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, StartTime, ms_start, run, fatigue
+    global interrupt_Start, interrupt_Stop, interrupt_Sect1, interrupt_Sect2, StartTick, soft_timer, StartTime, ms_start, run, fatigue, timer_chrono
     if interrupt_Sect1 == 0 and fin == 0 and run == 0 and Query_ID is not None:
         fatigue = 0
         interrupt_Stop = 0
@@ -376,6 +388,7 @@ def Interrupt_Sect2(unused):
             print(Sect2_Hour)
             dictionary["sector2"] = Sect2_Hour
             print(dictionary)
+            GPIO.output(signal_souffleuse2, 1)
             GPIO.output(sect2_barrier, 0)
             plan3_record()
 
@@ -420,6 +433,7 @@ def Interrupt_Stop(unused):
             GPIO.output(bonus_mmc_out, 0)
             GPIO.output(bonus_elt_out, 0)
             GPIO.output(bonus_aut_out, 0)
+            GPIO.output(signal_souffleuse2, 0)
 
             stop_record()
             r = requests.post(jelastic_api + "race/query-id/", headers={'Authorization': token_str}, json=dictionary)
@@ -470,7 +484,7 @@ GPIO.add_event_detect(S3, GPIO.RISING, callback=Interrupt_Sect1, bouncetime=200)
 GPIO.add_event_detect(S4, GPIO.RISING, callback=Interrupt_Sect2, bouncetime=200)
 GPIO.add_event_detect(S5, GPIO.RISING, callback=Capteur_Vitesse_1, bouncetime=200)
 GPIO.add_event_detect(S6, GPIO.RISING, callback=Capteur_Vitesse_2, bouncetime=200)
-GPIO.add_event_detect(RESET_BTN, GPIO.FALLING, callback = reset_total, bouncetime=200)
+# GPIO.add_event_detect(RESET_BTN, GPIO.FALLING, callback = reset_total, bouncetime=200)
 
 test = QRReader()
 try:
@@ -489,10 +503,10 @@ while True:
 
             old_qr = test.qr
             test.stop_detection()
-            bonus_activation(get_bonus(1))
             GPIO.output(signal_led, 0)
             start_record()
             Query_ID = test.qr
+            bonus_activation(get_bonus(get_id_car(Query_ID)))
             print (Query_ID)
 
 
